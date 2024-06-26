@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="player-left" class="player-area">
+            <h3>Player 1</h3>
+        </div>
+        <div id="card-grid"></div>
+        <div id="player-right" class="player-area">
+            <h3>Player 2</h3>
+        </div>
+    </div>
+    <div class="controls">
+        <label for="card-slider" id="slider-label">Number of cards per player: <span id="slider-value">7</span></label>
+        <input type="range" id="card-slider" min="7" max="26" value="7">
+        <button id="distribute-button">Distribute Cards</button>
+        <button id="shuffle-button">Shuffle</button>
+    </div>
+    <script src="work.js"></script>
+</body>
+</html>
