@@ -16,7 +16,7 @@ class Card {
         card.dataset.rank = this.rank;
 
         const cardBack = document.createElement('div');
-        cardBack.className = `card-back ${(this.suit === '♥' || this.suit === '♦') ? 'red' : 'black'}`;
+        cardBack.className = `card-back`;
 
         const topSuit = document.createElement('div');
         topSuit.className = 'suit-top';
@@ -27,7 +27,7 @@ class Card {
         bottomSuit.textContent = `${this.rank}${this.suit}`;
 
         const cardFront = document.createElement('div');
-        cardFront.className = 'card-front';
+        cardFront.className = `card-front ${(this.suit === '♥' || this.suit === '♦') ? 'red' : 'black'}`;
 
         cardFront.appendChild(topSuit);
         cardFront.appendChild(bottomSuit);
@@ -49,9 +49,9 @@ class Card {
 
 class Deck {
     constructor() {
-        this.cards = [];
         this.suits = ['♠', '♥', '♣', '♦'];
         this.ranks = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
+        this.cards = [];
         this.createDeck();
     }
 
@@ -70,63 +70,65 @@ class Deck {
             [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
         }
     }
-
-    deal(numCards) {
-        return this.cards.splice(0, numCards);
-    }
 }
 
 class Player {
     constructor(name, element) {
         this.name = name;
         this.element = element;
-        this.hand = [];
+        this.cardContainer = null;
+        this.cardCount = 0;
         this.setupPlayerArea();
     }
 
     setupPlayerArea() {
         this.element.innerHTML = `<h3>${this.name}</h3>`;
+        
+        const sortButton = document.createElement('button');
+        sortButton.textContent = 'Sort Cards';
+        sortButton.className = 'sort-button';
+        sortButton.addEventListener('click', () => this.sortCards());
+        
+        const revealButton = document.createElement('button');
+        revealButton.textContent = 'Reveal Cards';
+        revealButton.className = 'reveal-button';
+        revealButton.addEventListener('click', () => this.revealCards());
+
         this.cardContainer = document.createElement('div');
         this.cardContainer.className = 'card-container';
-        
-        this.sortButton = this.createButton('Sort Cards', 'sort-button', () => this.sortCards());
-        this.revealButton = this.createButton('Reveal Cards', 'reveal-button', () => this.revealCards());
-        this.rankDropdown = this.createRankDropdown();
-        this.cardCountInput = this.createCardCountInput();
-        this.placeButton = this.createButton('Place', 'place-button', () => game.placeCards(this));
-        this.callBluffButton = this.createButton('Call Bluff', 'call-bluff-button', () => game.callBluff(this));
 
-        this.element.appendChild(this.sortButton);
-        this.element.appendChild(this.revealButton);
+        this.element.appendChild(sortButton);
+        this.element.appendChild(revealButton);
         this.element.appendChild(this.cardContainer);
-        this.element.appendChild(this.rankDropdown);
-        this.element.appendChild(this.cardCountInput);
-        this.element.appendChild(this.placeButton);
-        this.element.appendChild(this.callBluffButton);
 
-        this.element.addEventListener('dragover', dragOver);
-        this.element.addEventListener('dragenter', dragEnter);
-        this.element.addEventListener('dragleave', dragLeave);
-        this.element.addEventListener('drop', drop);
-    }
+        const rankDropdown = this.createRankDropdown();
+        this.element.appendChild(rankDropdown);
 
-    createButton(text, className, clickHandler) {
-        const button = document.createElement('button');
-        button.textContent = text;
-        button.className = className;
-        button.addEventListener('click', clickHandler);
-        return button;
+        const cardCountInput = this.createCardCountInput();
+        this.element.appendChild(cardCountInput);
+
+        const placeButton = this.createPlaceButton();
+        const callBluffButton = this.createCallBluffButton();
+        this.element.appendChild(placeButton);
+        this.element.appendChild(callBluffButton);
+
+        this.updateCardCountDisplay();
     }
 
     createRankDropdown() {
         const dropdown = document.createElement('select');
         dropdown.className = 'rank-dropdown';
-        game.deck.ranks.forEach(rank => {
+        Game.ranks.forEach(rank => {
             const option = document.createElement('option');
             option.value = rank;
             option.textContent = rank;
             dropdown.appendChild(option);
         });
+
+        dropdown.addEventListener('change', () => {
+            console.log(`Selected rank for ${this.name}: ${dropdown.value}`);
+        });
+
         return dropdown;
     }
 
@@ -135,23 +137,43 @@ class Player {
         input.type = 'number';
         input.className = 'card-count-input';
         input.placeholder = 'Number of cards';
+        input.style.width = '90%';
+        input.min = 0;
+        input.max = Game.cardsPerPlayer;
+        input.addEventListener('input', () => {
+            console.log(`Entered number of cards for ${this.name}: ${input.value}`);
+        });
+
         return input;
     }
 
-    addCards(cards) {
-        this.hand = this.hand.concat(cards);
-        cards.forEach(card => this.cardContainer.appendChild(card.element));
+    createPlaceButton() {
+        const placeButton = document.createElement('button');
+        placeButton.textContent = 'Place';
+        placeButton.className = 'place-button';
+        placeButton.addEventListener('click', () => game.placeCards(this));
+        return placeButton;
+    }
+
+    createCallBluffButton() {
+        const callBluffButton = document.createElement('button');
+        callBluffButton.textContent = 'Call Bluff';
+        callBluffButton.className = 'call-bluff-button';
+        callBluffButton.disabled = true;
+        callBluffButton.addEventListener('click', () => game.callBluff(this));
+        return callBluffButton;
     }
 
     sortCards() {
+        const cards = Array.from(this.cardContainer.querySelectorAll('.card-wrapper'));
         const suitOrder = ['♠', '♥', '♣', '♦'];
         const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
 
-        this.hand.sort((a, b) => {
-            const suitA = a.suit;
-            const suitB = b.suit;
-            const rankA = a.rank;
-            const rankB = b.rank;
+        cards.sort((a, b) => {
+            const suitA = a.querySelector('.card').dataset.suit;
+            const suitB = b.querySelector('.card').dataset.suit;
+            const rankA = a.querySelector('.card').dataset.rank;
+            const rankB = b.querySelector('.card').dataset.rank;
 
             if (suitA !== suitB) {
                 return suitOrder.indexOf(suitA) - suitOrder.indexOf(suitB);
@@ -160,145 +182,163 @@ class Player {
             }
         });
 
-        this.hand.forEach((card, index) => {
+        const sortedPositions = cards.map((card, index) => {
             const row = Math.floor(index / 13);
             const col = index % 13;
-            const targetPosition = {
-                left: this.cardContainer.offsetLeft + col * 20,
-                top: this.cardContainer.offsetTop + row * 30
+            return {
+                left: col * 20,
+                top: row * 30
             };
-            this.animateCardSort(card.element, targetPosition, index * 50);
+        });
+
+        cards.forEach((card, index) => {
+            const targetPosition = {
+                left: this.cardContainer.offsetLeft + sortedPositions[index].left,
+                top: this.cardContainer.offsetTop + sortedPositions[index].top
+            };
+            this.animateCardSort(card, targetPosition, index * 50);
         });
 
         setTimeout(() => {
-            this.hand.forEach(card => this.cardContainer.appendChild(card.element));
-        }, this.hand.length * 50 + 500);
+            cards.forEach(card => this.cardContainer.appendChild(card));
+        }, cards.length * 50 + 500);
     }
 
-    animateCardSort(cardElement, targetPosition, delay) {
-        const startPosition = cardElement.getBoundingClientRect();
+    animateCardSort(card, targetPosition, delay) {
+        const startPosition = card.getBoundingClientRect();
         const deltaX = targetPosition.left - startPosition.left;
         const deltaY = targetPosition.top - startPosition.top;
 
-        cardElement.style.zIndex = '1000';
-        cardElement.style.transition = 'none';
-        cardElement.style.transform = `translate(0, 0)`;
+        card.style.zIndex = '1000';
+        card.style.transition = 'none';
+        card.style.transform = `translate(0, 0)`;
 
         setTimeout(() => {
-            cardElement.style.transition = 'transform 0.5s ease';
-            cardElement.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            card.style.transition = 'transform 0.5s ease';
+            card.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         }, delay);
 
         setTimeout(() => {
-            cardElement.style.transition = 'none';
-            cardElement.style.transform = 'none';
-            cardElement.style.zIndex = '';
+            card.style.transition = 'none';
+            card.style.transform = 'none';
+            card.style.zIndex = '';
         }, delay + 500);
     }
 
     revealCards() {
-        this.hand.forEach(card => card.element.querySelector('.card').classList.add('flipped'));
+        const cards = Array.from(this.cardContainer.querySelectorAll('.card'));
+        cards.forEach(card => {
+            card.classList.add('flipped');
+        });
+    }
+
+    updateCardCountDisplay() {
+        let countDisplay = this.element.querySelector('.player-count');
+        if (!countDisplay) {
+            countDisplay = document.createElement('div');
+            countDisplay.className = 'player-count';
+            this.element.insertBefore(countDisplay, this.element.firstChild);
+        }
+        countDisplay.textContent = `Cards: ${this.cardCount}`;
     }
 
     enableDragging() {
-        this.hand.forEach(card => {
-            card.element.draggable = true;
-            card.element.addEventListener('dragstart', dragStart);
-            card.element.addEventListener('dragend', dragEnd);
+        const cards = this.cardContainer.querySelectorAll('.card-wrapper');
+        cards.forEach(card => {
+            card.draggable = true;
+            card.addEventListener('dragstart', Game.dragStart);
+            card.addEventListener('dragend', Game.dragEnd);
         });
     }
 
     disableDragging() {
-        this.hand.forEach(card => {
-            card.element.draggable = false;
-            card.element.removeEventListener('dragstart', dragStart);
-            card.element.removeEventListener('dragend', dragEnd);
+        const cards = this.cardContainer.querySelectorAll('.card-wrapper');
+        cards.forEach(card => {
+            card.draggable = false;
+            card.removeEventListener('dragstart', Game.dragStart);
+            card.removeEventListener('dragend', Game.dragEnd);
         });
+    }
+
+    updatePlaceButton(enabled) {
+        const placeButton = this.element.querySelector('.place-button');
+        placeButton.disabled = !enabled;
+    }
+
+    updateCallBluffButton(disabled) {
+        const callBluffButton = this.element.querySelector('.call-bluff-button');
+        callBluffButton.disabled = disabled;
     }
 }
 
 class Game {
+    static suits = ['♠', '♥', '♣', '♦'];
+    static ranks = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
+    static cardsPerPlayer = 26;
+
     constructor() {
         this.deck = new Deck();
         this.player1 = new Player('Player 1', document.getElementById('player-left'));
         this.player2 = new Player('Player 2', document.getElementById('player-right'));
-        this.gameArea = document.getElementById('game-area');
+        this.gameArea = document.createElement('div');
+        this.gameArea.id = 'game-area';
+        document.body.appendChild(this.gameArea);
         this.cardGrid = document.getElementById('card-grid');
-        this.activePlayer = null;
-        this.remainingMoves = 0;
-        this.gameAreaCounter = 0;
-        this.lastPlay = { player: null, rank: null, count: 0 };
-
-        this.setupGameArea();
-        this.setupControls();
-        this.init();
-    }
-
-    setupGameArea() {
-        this.gameArea.style.display = 'none';
-        this.gameArea.style.position = 'absolute';
-        this.gameArea.style.left = '50%';
-        this.gameArea.style.top = '50%';
-        this.gameArea.style.transform = 'translate(-50%, -50%)';
-        this.gameArea.style.width = '300px';
-        this.gameArea.style.minHeight = '200px';
-        this.gameArea.style.border = '2px dashed #000';
-        this.gameArea.style.backgroundColor = '#f8f8f8';
-        this.gameArea.style.zIndex = '100';
-        this.gameArea.style.fontSize = '18px';
-        this.gameArea.style.fontFamily = 'Arial, sans-serif';
-        this.gameArea.style.overflowY = 'auto';
-        this.gameArea.style.padding = '20px';
-
-        this.gameArea.addEventListener('dragover', dragOver);
-        this.gameArea.addEventListener('dragenter', dragEnter);
-        this.gameArea.addEventListener('dragleave', dragLeave);
-        this.gameArea.addEventListener('drop', (event) => this.dropInGameArea(event));
-    }
-
-    init() {
-        this.deck.createDeck();
-        this.displayDeck();
-        this.cardGrid.style.display = 'flex';  // Ensure the card grid is visible
-        this.cardGrid.style.flexWrap = 'wrap';
-        this.cardGrid.style.justifyContent = 'center';
-        this.cardGrid.style.alignItems = 'center';
-        this.cardGrid.style.width = '100%';
-        this.cardGrid.style.height = '100%';
-    }
-
-    setupControls() {
         this.shuffleButton = document.getElementById('shuffle-button');
         this.distributeButton = document.getElementById('distribute-button');
         this.cardSlider = document.getElementById('card-slider');
         this.sliderLabel = document.getElementById('slider-label');
         this.sliderValue = document.getElementById('slider-value');
 
+        this.draggedCard = null;
+        this.activePlayer = null;
+        this.remainingMoves = 0;
+        this.gameAreaCounter = 0;
+
+        this.lastPlay = {
+            player: null,
+            rank: null,
+            count: 0
+        };
+
+        this.setupEventListeners();
+        this.initializeGame();
+        this.displayDeck();
+    }
+
+    setupEventListeners() {
         this.shuffleButton.addEventListener('click', () => this.shuffleDeck());
         this.distributeButton.addEventListener('click', () => this.distributeCards());
         this.cardSlider.addEventListener('input', () => {
             this.sliderValue.textContent = this.cardSlider.value;
         });
+        this.gameArea.addEventListener('dragover', Game.dragOver);
+        this.gameArea.addEventListener('dragenter', Game.dragEnter);
+        this.gameArea.addEventListener('dragleave', Game.dragLeave);
+        this.gameArea.addEventListener('drop', (e) => this.dropInGameArea(e));
     }
 
-    shuffleDeck() {
-        this.deck.shuffle();
+    initializeGame() {
         this.displayDeck();
-        this.animateShuffle();
+        this.player1.updatePlaceButton(false);
+        this.player2.updatePlaceButton(false);
+        this.player1.disableDragging();
+        this.player2.disableDragging();
     }
 
     displayDeck() {
         this.cardGrid.innerHTML = '';
         this.deck.cards.forEach((card, index) => {
             this.cardGrid.appendChild(card.element);
-            setTimeout(() => {
-                this.stackCards(index);
-            }, 10);
         });
+        setTimeout(() => {
+            this.deck.cards.forEach((card, index) => {
+                this.stackCards(card.element, index);
+            });
+        }, 10);
     }
 
-    stackCards(index) {
-        const card = this.deck.cards[index].element;
+    stackCards(card, index) {
         const totalCards = this.deck.cards.length;
         const maxOffset = 2;
         const maxRotation = 2;
@@ -314,39 +354,45 @@ class Game {
         card.style.transform += ` translateZ(${translateZ}px)`;
     }
 
+    shuffleDeck() {
+        this.deck.shuffle();
+        this.displayDeck();
+        this.animateShuffle();
+    }
+
     animateShuffle() {
         const cards = Array.from(this.cardGrid.querySelectorAll('.card-wrapper'));
         cards.forEach((card, index) => {
             setTimeout(() => {
                 card.style.transform = 'translateY(-20px)';
                 setTimeout(() => {
-                    this.stackCards(index);
+                    this.stackCards(card, index);
                 }, 150);
             }, index * 20);
         });
     }
 
     distributeCards() {
-        const cardsPerPlayer = parseInt(this.cardSlider.value);
-        this.player1.addCards(this.deck.deal(cardsPerPlayer));
-        this.player2.addCards(this.deck.deal(cardsPerPlayer));
+        Game.cardsPerPlayer = parseInt(this.cardSlider.value);
+        this.player1.cardCount = Game.cardsPerPlayer;
+        this.player2.cardCount = Game.cardsPerPlayer;
 
-        this.player1.hand.forEach((card, index) => {
+        this.deck.cards.slice(0, Game.cardsPerPlayer).forEach((card, index) => {
             setTimeout(() => {
                 this.animateDistribution(card.element, this.player1.cardContainer, index);
             }, index * 100);
         });
 
-        this.player2.hand.forEach((card, index) => {
+        this.deck.cards.slice(Game.cardsPerPlayer, Game.cardsPerPlayer * 2).forEach((card, index) => {
             setTimeout(() => {
                 this.animateDistribution(card.element, this.player2.cardContainer, index);
-            }, (index + cardsPerPlayer) * 100);
+            }, (index + Game.cardsPerPlayer) * 100);
         });
 
         setTimeout(() => {
             const remainingCards = Array.from(this.cardGrid.querySelectorAll('.card-wrapper'));
             remainingCards.forEach((card, index) => {
-                this.stackCards(index);
+                this.stackCards(card, index);
             });
 
             const stackWidth = 90;
@@ -360,16 +406,19 @@ class Game {
 
             this.hideControlButtons();
 
-            this.updatePlaceButton(this.player1, true);
-            this.updatePlaceButton(this.player2, true);
-        }, (cardsPerPlayer * 2 + 1) * 100);
+            this.player1.updatePlaceButton(true);
+            this.player2.updatePlaceButton(true);
+            this.player1.updateCardCountDisplay();
+            this.player2.updateCardCountDisplay();
+        }, (Game.cardsPerPlayer * 2 + 1) * 100);
     }
 
-    animateDistribution(cardElement, targetContainer, index) {
-        const originalRect = cardElement.getBoundingClientRect();
+    animateDistribution(cardWrapper, targetContainer, index) {
+        const card = cardWrapper.querySelector('.card');
+        const originalRect = cardWrapper.getBoundingClientRect();
         const targetRect = targetContainer.getBoundingClientRect();
 
-        const clone = cardElement.cloneNode(true);
+        const clone = cardWrapper.cloneNode(true);
         document.body.appendChild(clone);
         clone.style.position = 'fixed';
         clone.style.left = `${originalRect.left}px`;
@@ -385,26 +434,42 @@ class Game {
 
         setTimeout(() => {
             document.body.removeChild(clone);
-            cardElement.querySelector('.card').classList.add('card-locked');
-            targetContainer.appendChild(cardElement);
+            card.classList.add('card-locked');
+            targetContainer.appendChild(cardWrapper);
         }, 550);
     }
 
+    hideControlButtons() {
+        this.shuffleButton.style.display = 'none';
+        this.distributeButton.style.display = 'none';
+        this.cardSlider.style.display = 'none';
+        this.sliderValue.style.display = 'none';
+        this.sliderLabel.style.display = 'none';
+    }
+
     placeCards(player) {
-        const rank = player.rankDropdown.value;
-        const count = parseInt(player.cardCountInput.value);
+        if (this.activePlayer) {
+            console.error("Another player is already placing cards");
+            return;
+        }
+
+        const rankDropdown = player.element.querySelector('.rank-dropdown');
+        const cardCountInput = player.element.querySelector('.card-count-input');
+        const rank = rankDropdown.value;
+        const count = parseInt(cardCountInput.value);
 
         if (rank && count && count > 0) {
-            const playerName = player === this.player1 ? 'Player 1' : 'Player 2';
-            const text = `${playerName} is playing ${count} ${rank}${count > 1 ? 's' : ''}`;
-            this.updateGameArea(text);
+            this.updateGameArea(`${player.name} is playing ${count} ${rank}${count > 1 ? 's' : ''}`);
 
             this.activePlayer = player;
             this.remainingMoves = count;
 
-            player.hand.forEach(card => {
-                if (card.rank === rank) {
-                    card.element.querySelector('.card').classList.remove('flipped');
+            // Flip selected cards face down
+            const cards = player.cardContainer.querySelectorAll('.card-wrapper');
+            cards.forEach(cardWrapper => {
+                const card = cardWrapper.querySelector('.card');
+                if (card.dataset.rank === rank) {
+                    card.classList.remove('flipped');
                 }
             });
 
@@ -415,9 +480,10 @@ class Game {
             };
 
             player.enableDragging();
-            this.updatePlaceButton(player, false);
-            this.updatePlaceButton(player === this.player1 ? this.player2 : this.player1, true);
-            this.updateCallBluffButton(player === this.player1 ? this.player2 : this.player1, false);
+            player.updatePlaceButton(false);
+            const opponent = player === this.player1 ? this.player2 : this.player1;
+            opponent.updatePlaceButton(false);
+            opponent.updateCallBluffButton(false);
         }
     }
 
@@ -432,72 +498,97 @@ class Game {
 
         let bluffCalled = false;
         
+        // Calculate grid dimensions
         const gridCols = Math.ceil(Math.sqrt(revealedCards.length));
         const gridRows = Math.ceil(revealedCards.length / gridCols);
         
-        const cardWidth = 90;
-        const cardHeight = 120;
-        const gridWidth = cardWidth * gridCols + (gridCols - 1) * 10;
+        // Calculate card and grid sizes
+        const cardWidth = 90; 
+        const cardHeight = 120; 
+        const gridWidth = cardWidth * gridCols + (gridCols - 1) * 10; 
         const gridHeight = cardHeight * gridRows + (gridRows - 1) * 10;
         
+        // Calculate starting position for the grid
         const startX = (this.gameArea.clientWidth - gridWidth) / 2;
         const startY = (this.gameArea.clientHeight - gridHeight) / 2;
 
         revealedCards.forEach((cardWrapper, index) => {
             const card = cardWrapper.querySelector('.card');
+            
+            // Remove the 'card-locked' class to allow flipping
             card.classList.remove('card-locked');
             
+            // Calculate grid position
             const col = index % gridCols;
             const row = Math.floor(index / gridCols);
             const x = startX + col * (cardWidth + 10);
             const y = startY + row * (cardHeight + 10);
             
+            // Animate the card to its grid position
             cardWrapper.style.transition = 'all 0.5s ease-in-out';
             cardWrapper.style.position = 'absolute';
             cardWrapper.style.left = `${x}px`;
             cardWrapper.style.top = `${y}px`;
             cardWrapper.style.zIndex = 1000 + index;
             
+            // Flip the card with a slight delay
             setTimeout(() => {
                 card.style.transition = 'transform 0.6s ease-in-out';
                 card.classList.add('flipped');
             }, index * 100);
             
+            // Check if the card matches the claimed rank
             if (card.dataset.rank !== this.lastPlay.rank) {
                 bluffCalled = true;
             }
         });
 
-        const callingPlayerName = player === this.player1 ? 'Player 1' : 'Player 2';
-        const calledPlayerName = this.lastPlay.player === this.player1 ? 'Player 1' : 'Player 2';
-        
         let bluffResult;
         let targetPlayer;
         
         if (bluffCalled) {
             bluffResult = "Bluff called successfully! The cards don't match the claim.";
-            targetPlayer = this.lastPlay.player;
+            targetPlayer = this.lastPlay.player; 
         } else {
             bluffResult = "No bluff. The play was honest.";
-            targetPlayer = player;
+            targetPlayer = player; 
         }
         
-        this.updateGameArea(`${callingPlayerName} called bluff. ${bluffResult}`);
+        this.updateGameArea(`${player.name} called bluff. ${bluffResult}`);
 
-        this.updateCallBluffButton(this.player1, true);
-        this.updateCallBluffButton(this.player2, true);
+        // Disable both Call Bluff buttons
+        this.player1.updateCallBluffButton(true);
+        this.player2.updateCallBluffButton(true);
 
-        this.updatePlaceButton(this.player1, true);
-        this.updatePlaceButton(this.player2, true);
+        // Re-enable both Place buttons
+        this.player1.updatePlaceButton(true);
+        this.player2.updatePlaceButton(true);
 
+        // Add a delay before moving cards
         setTimeout(() => {
             const allCards = Array.from(this.gameArea.querySelectorAll('.card-wrapper'));
             const targetContainer = targetPlayer.cardContainer;
 
+            const cardsToAdd = allCards.length;
+
+            if (targetPlayer === this.player1) {
+                this.player1.cardCount += cardsToAdd;
+                this.player2.cardCount -= this.lastPlay.count;
+            } else {
+                this.player2.cardCount += cardsToAdd;
+                this.player1.cardCount -= this.lastPlay.count;
+            }
+
+            this.player1.updateCardCountDisplay();
+            this.player2.updateCardCountDisplay();
+
             allCards.forEach((cardWrapper, index) => {
                 const card = cardWrapper.querySelector('.card');
+                
+                // Flip the card back
                 card.classList.remove('flipped');
                 
+                // Animate the card to the target player's area
                 setTimeout(() => {
                     cardWrapper.style.transition = 'all 0.5s ease-in-out';
                     cardWrapper.style.position = 'absolute';
@@ -507,6 +598,7 @@ class Game {
                     cardWrapper.style.top = `${targetRect.top - gameAreaRect.top + Math.floor(index / 5) * 30}px`;
                     cardWrapper.style.zIndex = index;
                     
+                    // Move the card to the target container after animation
                     setTimeout(() => {
                         targetContainer.appendChild(cardWrapper);
                         cardWrapper.style.position = '';
@@ -518,16 +610,18 @@ class Game {
                 }, index * 50);
             });
 
-            const receivingPlayerName = targetPlayer === this.player1 ? 'Player 1' : 'Player 2';
-            this.updateGameArea(`${receivingPlayerName} receives all the cards!`);
+            // Update game state
+            this.updateGameArea(`${targetPlayer.name} receives all the cards!`);
 
+            // Re-enable both Place buttons after moving cards
             setTimeout(() => {
-                this.updatePlaceButton(this.player1, true);
-                this.updatePlaceButton(this.player2, true);
+                this.player1.updatePlaceButton(true);
+                this.player2.updatePlaceButton(true);
             }, allCards.length * 50 + 1000);
 
-        }, 2000);
+        }, 2000); 
 
+        // Reset lastPlay
         this.lastPlay = {
             player: null,
             rank: null,
@@ -547,50 +641,27 @@ class Game {
         this.gameArea.style.minHeight = '200px';
     }
 
-    finishTurn() {
-        const playerName = this.activePlayer === this.player1 ? 'Player 1' : 'Player 2';
-        this.updateGameArea(`${playerName} finished their turn.`);
-        this.activePlayer.disableDragging();
-        this.updatePlaceButton(this.activePlayer, true);
-        
-        const opponent = this.activePlayer === this.player1 ? this.player2 : this.player1;
-        this.updateCallBluffButton(opponent, false);
-        
-        this.activePlayer = null;
-    }
-
-    hideControlButtons() {
-        this.shuffleButton.style.display = 'none';
-        this.distributeButton.style.display = 'none';
-        this.cardSlider.style.display = 'none';
-        this.sliderValue.style.display = 'none';
-        this.sliderLabel.style.display = 'none';
-    }
-
-    updatePlaceButton(player, enabled) {
-        player.placeButton.disabled = !enabled;
-    }
-
-    updateCallBluffButton(player, disabled) {
-        player.callBluffButton.disabled = disabled;
-    }
-
     dropInGameArea(event) {
         event.preventDefault();
-        if (this.activePlayer && this.remainingMoves > 0 && !draggedCard.querySelector('.card').classList.contains('flipped')) {
-            this.gameArea.appendChild(draggedCard);
-            const card = draggedCard.querySelector('.card');
+        if (this.activePlayer && this.remainingMoves > 0 && !this.draggedCard.querySelector('.card').classList.contains('flipped')) {
+            this.gameArea.appendChild(this.draggedCard);
+            const card = this.draggedCard.querySelector('.card');
             card.classList.add('card-locked');
             
-            const cardWidth = 90;
-            const cardHeight = 120;
+            // Decrease the card count for the active player
+            this.activePlayer.cardCount--;
+            this.activePlayer.updateCardCountDisplay();
+            
+            // Center and stack cards
+            const cardWidth = 90; 
+            const cardHeight = 120; 
             const offsetX = (this.gameArea.clientWidth - cardWidth) / 2;
             const offsetY = (this.gameArea.clientHeight - cardHeight) / 2;
             
-            draggedCard.style.position = 'absolute';
-            draggedCard.style.left = `${offsetX + this.gameAreaCounter * 2}px`;
-            draggedCard.style.top = `${offsetY + this.gameAreaCounter * 2}px`;
-            draggedCard.style.zIndex = this.gameAreaCounter;
+            this.draggedCard.style.position = 'absolute';
+            this.draggedCard.style.left = `${offsetX + this.gameAreaCounter * 2}px`;
+            this.draggedCard.style.top = `${offsetY + this.gameAreaCounter * 2}px`;
+            this.draggedCard.style.zIndex = this.gameAreaCounter;
 
             this.gameAreaCounter++;
             
@@ -602,58 +673,74 @@ class Game {
         }
         event.target.classList.remove('dragover');
     }
-}
 
-// Global variables and functions
-let draggedCard = null;
+    finishTurn() {
+        this.updateGameArea(`${this.activePlayer.name} finished their turn.`);
+        this.activePlayer.disableDragging();
+        this.activePlayer.updatePlaceButton(true);
+        
+        const opponent = this.activePlayer === this.player1 ? this.player2 : this.player1;
+        this.activePlayer.updatePlaceButton(false);
+        opponent.updatePlaceButton(true);
+        opponent.updateCallBluffButton(false);
 
-function dragStart(event) {
-    if (game.activePlayer && 
-        event.target.closest('.player-area') === game.activePlayer.element && 
-        game.remainingMoves > 0 &&
-        !event.target.closest('.card').classList.contains('flipped')) {
-        draggedCard = event.target.closest('.card-wrapper');
-        setTimeout(() => {
-            draggedCard.style.display = 'none';
-        }, 0);
-    } else {
+        this.activePlayer = null;
+    }
+
+    static dragStart(event) {
+        if (game.activePlayer && 
+            event.target.closest('.player-area') === game.activePlayer.element && 
+            game.remainingMoves > 0 &&
+            !event.target.closest('.card').classList.contains('flipped')) {
+            game.draggedCard = event.target.closest('.card-wrapper');
+            setTimeout(() => {
+                game.draggedCard.style.display = 'none';
+            }, 0);
+        } else {
+            event.preventDefault();
+        }
+    }
+
+    static dragEnd() {
+        if (game.draggedCard) {
+            game.draggedCard.style.display = 'block';
+            game.draggedCard = null;
+        }
+    }
+
+    static dragOver(event) {
         event.preventDefault();
     }
-}
 
-function dragEnd() {
-    if (draggedCard) {
-        draggedCard.style.display = 'block';
-        draggedCard = null;
+    static dragEnter(event) {
+        event.preventDefault();
+        if (event.target.classList.contains('player-area')) {
+            event.target.classList.add('dragover');
+        }
     }
-}
 
-function dragOver(event) {
-    event.preventDefault();
-}
-
-function dragEnter(event) {
-    event.preventDefault();
-    if (event.target.classList.contains('player-area')) {
-        event.target.classList.add('dragover');
+    static dragLeave(event) {
+        if (event.target.classList.contains('player-area')) {
+            event.target.classList.remove('dragover');
+        }
     }
-}
-
-function dragLeave(event) {
-    if (event.target.classList.contains('player-area')) {
-        event.target.classList.remove('dragover');
-    }
-}
-
-function drop(event) {
-    event.preventDefault();
-    if (event.target.classList.contains('player-area') || event.target.classList.contains('card-container')) {
-        const cardContainer = event.target.classList.contains('card-container') ? event.target : event.target.querySelector('.card-container');
-        cardContainer.appendChild(draggedCard);
-        draggedCard.querySelector('.card').classList.remove('card-locked');
-    }
-    event.target.classList.remove('dragover');
 }
 
 // Initialize the game
 const game = new Game();
+
+// Set up game area styles
+game.gameArea.style.display = 'none';
+game.gameArea.style.position = 'absolute';
+game.gameArea.style.left = '50%';
+game.gameArea.style.top = '50%';
+game.gameArea.style.transform = 'translate(-50%, -50%)';
+game.gameArea.style.width = '300px';
+game.gameArea.style.minHeight = '200px';
+game.gameArea.style.border = '2px dashed #000';
+game.gameArea.style.backgroundColor = '#f8f8f8';
+game.gameArea.style.zIndex = '100';
+game.gameArea.style.fontSize = '18px';
+game.gameArea.style.fontFamily = 'Arial, sans-serif';
+game.gameArea.style.overflowY = 'auto';
+game.gameArea.style.padding = '20px';
